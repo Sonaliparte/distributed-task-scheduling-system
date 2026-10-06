@@ -1,84 +1,63 @@
+/**
+ * server.js
+ * ---------
+ * Layer 2 Entry Point — Task Management Backend
+ *
+ * This is the main Express server for the Distributed Task Scheduler.
+ * Layer 2 introduces in-memory task storage and a clean REST API.
+ *
+ * Architecture:
+ *   React Dashboard → Backend API (this file) → In-Memory Store
+ *
+ * Future layers will add:
+ *   Backend → Scheduler → Worker Nodes → Task Execution
+ */
+
 const express = require("express");
 const cors = require("cors");
+const taskRoutes = require("./routes/taskRoutes");
 
 const app = express();
 
+// ── Middleware ──────────────────────────────────────────────────────────────
+
+// Allow requests from the Vite frontend running on a different port
 app.use(cors());
+
+// Parse incoming JSON request bodies
 app.use(express.json());
 
-const SCHEDULER_URL = "http://localhost:5001";
+// ── Routes ──────────────────────────────────────────────────────────────────
 
-// Health check
-app.get("/", (req, res) => {
-  res.json({
-    message: "Backend is running",
-  });
+/**
+ * GET /api/health
+ * Simple health check — confirms the server is online.
+ */
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ message: "Backend is running" });
 });
 
-// Submit a new task
-app.post("/tasks", async (req, res) => {
-  try {
-    const { name, priority } = req.body;
+/**
+ * /api/tasks  →  All task CRUD operations
+ * See routes/taskRoutes.js for individual endpoints.
+ */
+app.use("/api/tasks", taskRoutes);
 
-    if (!name) {
-      return res.status(400).json({
-        message: "Task name is required",
-      });
-    }
-
-    const response = await fetch(`${SCHEDULER_URL}/tasks`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name,
-        priority: priority || "Medium",
-      }),
-    });
-
-    const data = await response.json();
-
-    res.status(response.status).json(data);
-  } catch (error) {
-    console.error(error);
-
-    res.status(500).json({
-      message: "Could not connect to scheduler",
-    });
-  }
+// ── Global Error Handler ─────────────────────────────────────────────────────
+// Catches any unhandled errors so the server never crashes on bad requests.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error("Unexpected server error:", err);
+  res.status(500).json({ message: "Internal server error" });
 });
 
-// Get all tasks
-app.get("/tasks", async (req, res) => {
-  try {
-    const response = await fetch(`${SCHEDULER_URL}/tasks`);
-    const data = await response.json();
-
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({
-      message: "Could not fetch tasks",
-    });
-  }
-});
-
-// Get workers
-app.get("/workers", async (req, res) => {
-  try {
-    const response = await fetch(`${SCHEDULER_URL}/workers`);
-    const data = await response.json();
-
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({
-      message: "Could not fetch workers",
-    });
-  }
-});
+// ── Start Server ─────────────────────────────────────────────────────────────
 
 const PORT = 5000;
 
 app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
+  console.log(`✅ Backend running on http://localhost:${PORT}`);
+  console.log(`   Health : GET  http://localhost:${PORT}/api/health`);
+  console.log(`   Tasks  : GET  http://localhost:${PORT}/api/tasks`);
+  console.log(`   Create : POST http://localhost:${PORT}/api/tasks`);
 });
