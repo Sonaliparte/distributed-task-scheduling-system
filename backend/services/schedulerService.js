@@ -1,113 +1,137 @@
 /**
  * schedulerService.js
  * -------------------
- * Core scheduling logic for the Distributed Task Scheduler.
+ * Core Scheduling Engine for Layer 3.
  *
- * Algorithm: Resource-Aware / Least-Loaded Scheduling
- *
- * Steps:
- *  1. Filter online workers.
- *  2. Check each worker has enough free CPU and Memory for the task.
- *  3. Score every eligible worker: score = (cpu * 0.6) + (memory * 0.4)
- *  4. Select the worker with the lowest score (least loaded).
- *  5. Assign the task, update worker usage, and return the decision.
+ * Implements Resource-Aware / Least-Loaded Scheduling:
+ *  1. Retrieves queued task.
+ *  2. Evaluates online workers for CPU & Memory capacity.
+ *  3. Computes resource score: (cpuUsage * 0.6) + (memoryUsage * 0.4)
+ *  4. Selects worker with the lowest score.
+ *  5. Assigns task, updates task status to "assigned", sets worker ID.
+ *  6. Updates worker active tasks count and simulated CPU / Memory usage.
  */
 
+const tasks = require("../data/taskStore");
 const workers = require("../data/workerStore");
-const tasks   = require("../data/taskStore");
 const {
-  calculateScore,
+  calculateResourceScore,
   hasEnoughResources,
-  simulateResourceIncrease,
+  updateWorkerResourceUsage,
 } = require("../utils/resourceCalculator");
 
 /**
- * scheduleTask
- * ------------
- * Main entry point for the scheduling engine.
- *
- * @param {string} taskId - ID of the queued task to schedule
- * @returns {object} result - Scheduling decision (success or failure)
+ * Main scheduling function.
+ * @param {string} taskId - The ID of the task to schedule
+ * @returns {object} Result of the scheduling operation
  */
-const scheduleTask = (taskId) => {
-  // ── 1. Find the task ────────────────────────────────────────────────────────
+function scheduleTaskById(taskId) {
+  // 1. Find the task
   const task = tasks.find((t) => t.id === taskId);
 
   if (!task) {
-    return { success: false, reason: "TASK_NOT_FOUND" };
+    return { success: false, statusCode: 404, message: "Task not found" };
   }
 
+  // 2. Verify task is queued
   if (task.status !== "queued") {
-    return { success: false, reason: "TASK_NOT_QUEUED", currentStatus: task.status };
+    return {
+      success: false,
+      statusCode: 400,
+      message: `Task is already in status '${task.status}' and cannot be scheduled`,
+    };
   }
 
-  console.log(`\n[SCHEDULER] Received task: ${task.name}`);
-  console.log(`[SCHEDULER] CPU required: ${task.cpu} cores | Memory required: ${task.memory} MB`);
-  console.log("[SCHEDULER] Evaluating workers...\n");
+  console.log(`\n[SCHEDULER] Received task: ${task.name} (ID: ${task.id})`);
+  console.log(`[SCHEDULER] Required Resources -> CPU: ${task.cpu} core(s), Memory: ${task.memory} MB`);
+  console.log(`[SCHEDULER] Evaluating workers...`);
 
-  // ── 2. Filter online workers and score them ─────────────────────────────────
-  const eligibleWorkers = [];
+  // 3. Filter online workers that satisfy CPU and Memory capacity requirements
+  const candidates = [];
 
   for (const worker of workers) {
-    if (!hasEnoughResources(worker, task.cpu, task.memory)) {
-      console.log(
-        `[SCHEDULER] ${worker.id} — SKIPPED (status: ${worker.status}, ` +
-        `cpu: ${worker.cpuUsage}%, mem: ${worker.memoryUsage}%)`
-      );
+    if (worker.status !== "online") {
+      console.log(`[SCHEDULER] ${worker.id} is offline. Skipping.`);
       continue;
     }
 
-    const score = calculateScore(worker.cpuUsage, worker.memoryUsage);
+    const score = calculateResourceScore(worker.cpuUsage, worker.memoryUsage);
+    const suitable = hasEnoughResources(worker, task.cpu, task.memory);
 
-    console.log(`[SCHEDULER] ${worker.id}`);
-    console.log(`            CPU: ${worker.cpuUsage}%  Memory: ${worker.memoryUsage}%  Score: ${score}`);
+    console.log(
+      `[SCHEDULER] ${worker.id} | CPU: ${worker.cpuUsage}% | Memory: ${worker.memoryUsage}% | Score: ${score} | Capable: ${suitable ? "YES" : "NO"}`
+    );
 
-    eligibleWorkers.push({ worker, score });
+    if (suitable) {
+      candidates.push({ worker, score });
+    }
   }
 
-  // ── 3. Check if any worker is eligible ─────────────────────────────────────
-  if (eligibleWorkers.length === 0) {
-    console.log("[SCHEDULER] No suitable worker available. Task remains queued.\n");
-    return { success: false, reason: "NO_SUITABLE_WORKER" };
+  // 4. Handle case when no worker is capable or available
+  if (candidates.length === 0) {
+    console.log(`[SCHEDULER] ❌ No suitable worker available for task ${task.id}`);
+    return {
+      success: false,
+      statusCode: 200, // Return 200 with queued status message as requested by spec
+      data: {
+        message: "No suitable worker available",
+        taskId: task.id,
+        status: "queued",
+      },
+    };
   }
 
-  // ── 4. Select the lowest-score worker ──────────────────────────────────────
-  eligibleWorkers.sort((a, b) => a.score - b.score);
-  const { worker: selectedWorker, score: selectedScore } = eligibleWorkers[0];
+  // 5. Sort candidates by score ascending (lowest score wins)
+  candidates.sort((a, b) => a.score - b.score);
 
-  console.log(`\n[SCHEDULER] Selected: ${selectedWorker.id} (score: ${selectedScore})`);
+  const selectedCandidate = candidates[0];
+  const selectedWorker = selectedCandidate.worker;
+  const selectedScore = selectedCandidate.score;
 
-  // Capture before state for the scheduling decision log
-  const beforeCpu    = selectedWorker.cpuUsage;
-  const beforeMemory = selectedWorker.memoryUsage;
+  console.log(`[SCHEDULER] Selected ${selectedWorker.id} (Lowest Score: ${selectedScore})`);
 
-  // ── 5. Assign the task ──────────────────────────────────────────────────────
+  // 6. Calculate post-assignment simulated resource usage
+  const resourceChanges = updateWorkerResourceUsage(selectedWorker, task.cpu, task.memory);
+
+  // 7. Update Task state
   task.status = "assigned";
   task.worker = selectedWorker.id;
+  task.schedulingDecision = {
+    algorithm: "resource-aware",
+    scheduledAt: new Date().toISOString(),
+    workerId: selectedWorker.id,
+    score: selectedScore,
+    workerCpuBefore: resourceChanges.cpuBefore,
+    workerMemoryBefore: resourceChanges.memoryBefore,
+    workerCpuAfter: resourceChanges.cpuAfter,
+    workerMemoryAfter: resourceChanges.memoryAfter,
+  };
 
-  // ── 6. Update simulated worker resource usage ───────────────────────────────
-  simulateResourceIncrease(selectedWorker, task.cpu, task.memory);
+  // 8. Update Worker state
   selectedWorker.activeTasks += 1;
+  selectedWorker.cpuUsage = resourceChanges.cpuAfter;
+  selectedWorker.memoryUsage = resourceChanges.memoryAfter;
 
-  console.log(`[SCHEDULER] Task assigned to ${selectedWorker.id}`);
-  console.log(`[SCHEDULER] Worker CPU:    ${beforeCpu}%  →  ${selectedWorker.cpuUsage}%`);
-  console.log(`[SCHEDULER] Worker Memory: ${beforeMemory}%  →  ${selectedWorker.memoryUsage}%`);
-  console.log("[SCHEDULER] Task assigned successfully\n");
+  console.log(
+    `[SCHEDULER] Task assigned successfully! ${selectedWorker.id} load updated -> CPU: ${resourceChanges.cpuBefore}% -> ${resourceChanges.cpuAfter}%, Mem: ${resourceChanges.memoryBefore}% -> ${resourceChanges.memoryAfter}%\n`
+  );
 
-  // ── 7. Return scheduling decision ──────────────────────────────────────────
   return {
     success: true,
-    taskId: task.id,
-    workerId: selectedWorker.id,
-    algorithm: "resource-aware",
-    reason: {
-      cpuUsageBefore:    beforeCpu,
-      memoryUsageBefore: beforeMemory,
-      cpuUsageAfter:     selectedWorker.cpuUsage,
-      memoryUsageAfter:  selectedWorker.memoryUsage,
-      score:             selectedScore,
+    statusCode: 200,
+    data: {
+      message: "Task scheduled successfully",
+      taskId: task.id,
+      workerId: selectedWorker.id,
+      algorithm: "resource-aware",
+      reason: {
+        cpuUsage: resourceChanges.cpuBefore,
+        memoryUsage: resourceChanges.memoryBefore,
+        score: selectedScore,
+      },
+      schedulingDecision: task.schedulingDecision,
     },
   };
-};
+}
 
-module.exports = { scheduleTask };
+module.exports = { scheduleTaskById };

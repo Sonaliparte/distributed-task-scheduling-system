@@ -1,21 +1,18 @@
 /**
  * server.js
  * ---------
- * Layer 2 Entry Point — Task Management Backend
- *
- * This is the main Express server for the Distributed Task Scheduler.
- * Layer 2 introduces in-memory task storage and a clean REST API.
+ * Layer 3 Entry Point — Distributed Task Scheduler Backend
  *
  * Architecture:
- *   React Dashboard → Backend API (this file) → In-Memory Store
- *
- * Future layers will add:
- *   Backend → Scheduler → Worker Nodes → Task Execution
+ *   React Dashboard → Backend API → Scheduler → Simulated Worker Registry
  */
 
 const express = require("express");
 const cors = require("cors");
+
 const taskRoutes = require("./routes/taskRoutes");
+const workerRoutes = require("./routes/workerRoutes");
+const schedulerRoutes = require("./routes/schedulerRoutes");
 
 const app = express();
 
@@ -38,10 +35,13 @@ app.get("/api/health", (req, res) => {
 });
 
 /**
- * /api/tasks  →  All task CRUD operations
- * See routes/taskRoutes.js for individual endpoints.
+ * /api/tasks      → Task creation and retrieval
+ * /api/workers    → Simulated worker registry monitoring
+ * /api/scheduler  → Task scheduling engine endpoints
  */
 app.use("/api/tasks", taskRoutes);
+app.use("/api/workers", workerRoutes);
+app.use("/api/scheduler", schedulerRoutes);
 
 // ── Global Error Handler ─────────────────────────────────────────────────────
 // Catches any unhandled errors so the server never crashes on bad requests.
@@ -56,8 +56,10 @@ app.use((err, req, res, next) => {
 const PORT = 5000;
 
 app.listen(PORT, () => {
-  console.log(`✅ Backend running on http://localhost:${PORT}`);
-  console.log(`   Health : GET  http://localhost:${PORT}/api/health`);
-  console.log(`   Tasks  : GET  http://localhost:${PORT}/api/tasks`);
-  console.log(`   Create : POST http://localhost:${PORT}/api/tasks`);
+  console.log(`✅ Backend Layer 3 running on http://localhost:${PORT}`);
+  console.log(`   Health    : GET  http://localhost:${PORT}/api/health`);
+  console.log(`   Tasks     : GET  http://localhost:${PORT}/api/tasks`);
+  console.log(`   Create    : POST http://localhost:${PORT}/api/tasks`);
+  console.log(`   Workers   : GET  http://localhost:${PORT}/api/workers`);
+  console.log(`   Scheduler : POST http://localhost:${PORT}/api/scheduler/schedule/:taskId`);
 });

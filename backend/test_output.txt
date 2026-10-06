@@ -1,0 +1,168 @@
+Γ£à Backend Layer 3 running on http://localhost:5000
+   Health    : GET  http://localhost:5000/api/health
+   Tasks     : GET  http://localhost:5000/api/tasks
+   Create    : POST http://localhost:5000/api/tasks
+   Workers   : GET  http://localhost:5000/api/workers
+   Scheduler : POST http://localhost:5000/api/scheduler/schedule/:taskId
+==================================================
+STARTING LAYER 3 VERIFICATION TESTS
+==================================================
+
+A) GET /api/health: { status: 200, data: { message: 'Backend is running' } }
+
+B) GET /api/workers:
+[
+  {
+    "id": "worker-01",
+    "status": "online",
+    "cpuUsage": 30,
+    "memoryUsage": 40,
+    "totalCpu": 4,
+    "totalMemory": 8192,
+    "activeTasks": 1
+  },
+  {
+    "id": "worker-02",
+    "status": "online",
+    "cpuUsage": 70,
+    "memoryUsage": 60,
+    "totalCpu": 4,
+    "totalMemory": 8192,
+    "activeTasks": 3
+  },
+  {
+    "id": "worker-03",
+    "status": "online",
+    "cpuUsage": 20,
+    "memoryUsage": 35,
+    "totalCpu": 4,
+    "totalMemory": 8192,
+    "activeTasks": 0
+  }
+]
+
+B2) GET /api/workers/worker-01: worker-01
+
+C) POST /api/tasks (Create Task):
+{
+  "id": "5b991427-d822-4135-937c-8df27a4024c0",
+  "name": "Image Processing Job",
+  "type": "image-processing",
+  "priority": "high",
+  "cpu": 2,
+  "memory": 512,
+  "status": "queued",
+  "worker": null,
+  "createdAt": "2026-10-06T07:40:47.869Z"
+}
+
+D) Scheduling task via POST /api/scheduler/schedule/5b991427-d822-4135-937c-8df27a4024c0
+
+[SCHEDULER] Received task: Image Processing Job (ID: 5b991427-d822-4135-937c-8df27a4024c0)
+[SCHEDULER] Required Resources -> CPU: 2 core(s), Memory: 512 MB
+[SCHEDULER] Evaluating workers...
+[SCHEDULER] worker-01 | CPU: 30% | Memory: 40% | Score: 34 | Capable: YES
+[SCHEDULER] worker-02 | CPU: 70% | Memory: 60% | Score: 66 | Capable: NO
+[SCHEDULER] worker-03 | CPU: 20% | Memory: 35% | Score: 26 | Capable: YES
+[SCHEDULER] Selected worker-03 (Lowest Score: 26)
+[SCHEDULER] Task assigned successfully! worker-03 load updated -> CPU: 20% -> 70%, Mem: 35% -> 41.3%
+
+
+Schedule Result:
+{
+  "message": "Task scheduled successfully",
+  "taskId": "5b991427-d822-4135-937c-8df27a4024c0",
+  "workerId": "worker-03",
+  "algorithm": "resource-aware",
+  "reason": {
+    "cpuUsage": 20,
+    "memoryUsage": 35,
+    "score": 26
+  },
+  "schedulingDecision": {
+    "algorithm": "resource-aware",
+    "scheduledAt": "2026-10-06T07:40:47.871Z",
+    "workerId": "worker-03",
+    "score": 26,
+    "workerCpuBefore": 20,
+    "workerMemoryBefore": 35,
+    "workerCpuAfter": 70,
+    "workerMemoryAfter": 41.3
+  }
+}
+
+E) GET /api/tasks (After scheduling):
+[
+  {
+    "id": "5b991427-d822-4135-937c-8df27a4024c0",
+    "name": "Image Processing Job",
+    "type": "image-processing",
+    "priority": "high",
+    "cpu": 2,
+    "memory": 512,
+    "status": "assigned",
+    "worker": "worker-03",
+    "createdAt": "2026-10-06T07:40:47.869Z",
+    "schedulingDecision": {
+      "algorithm": "resource-aware",
+      "scheduledAt": "2026-10-06T07:40:47.871Z",
+      "workerId": "worker-03",
+      "score": 26,
+      "workerCpuBefore": 20,
+      "workerMemoryBefore": 35,
+      "workerCpuAfter": 70,
+      "workerMemoryAfter": 41.3
+    }
+  }
+]
+
+F) GET /api/workers (After scheduling):
+[
+  {
+    "id": "worker-01",
+    "status": "online",
+    "cpuUsage": 30,
+    "memoryUsage": 40,
+    "totalCpu": 4,
+    "totalMemory": 8192,
+    "activeTasks": 1
+  },
+  {
+    "id": "worker-02",
+    "status": "online",
+    "cpuUsage": 70,
+    "memoryUsage": 60,
+    "totalCpu": 4,
+    "totalMemory": 8192,
+    "activeTasks": 3
+  },
+  {
+    "id": "worker-03",
+    "status": "online",
+    "cpuUsage": 70,
+    "memoryUsage": 41.3,
+    "totalCpu": 4,
+    "totalMemory": 8192,
+    "activeTasks": 1
+  }
+]
+
+G) Edge Case Test: Oversized task (CPU: 10, Memory: 16384 MB)
+
+[SCHEDULER] Received task: Heavy ML Training Job (ID: 8bd00125-3ba8-4180-bd88-8280c9994dca)
+[SCHEDULER] Required Resources -> CPU: 10 core(s), Memory: 16384 MB
+[SCHEDULER] Evaluating workers...
+[SCHEDULER] worker-01 | CPU: 30% | Memory: 40% | Score: 34 | Capable: NO
+[SCHEDULER] worker-02 | CPU: 70% | Memory: 60% | Score: 66 | Capable: NO
+[SCHEDULER] worker-03 | CPU: 70% | Memory: 41.3% | Score: 58.519999999999996 | Capable: NO
+[SCHEDULER] Γ¥î No suitable worker available for task 8bd00125-3ba8-4180-bd88-8280c9994dca
+Oversized Schedule Result:
+{
+  "message": "No suitable worker available",
+  "taskId": "8bd00125-3ba8-4180-bd88-8280c9994dca",
+  "status": "queued"
+}
+
+==================================================
+ALL LAYER 3 VERIFICATION TESTS COMPLETED SUCCESSFULLY
+==================================================

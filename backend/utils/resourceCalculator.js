@@ -1,76 +1,66 @@
 /**
  * resourceCalculator.js
- * ---------------------
- * Pure utility functions for the resource-aware scheduling algorithm.
- * No side effects — easy to unit-test or swap the formula later.
+ * --------------------
+ * Helper utilities for resource scoring and capacity checks.
  */
-
-// Weight constants for the scoring formula
-const CPU_WEIGHT    = 0.6;
-const MEMORY_WEIGHT = 0.4;
 
 /**
- * calculateScore
- * --------------
- * Computes a resource score for a worker.
- * Lower score = less loaded = better candidate.
- *
- * Formula:
- *   score = (cpuUsage * 0.6) + (memoryUsage * 0.4)
- *
- * @param {number} cpuUsage    - Current CPU usage % (0–100)
- * @param {number} memoryUsage - Current Memory usage % (0–100)
- * @returns {number} score
+ * Calculates the resource-aware score for a worker.
+ * Formula: resourceScore = (cpuUsage * 0.6) + (memoryUsage * 0.4)
+ * Lower score = less loaded worker = better candidate.
  */
-const calculateScore = (cpuUsage, memoryUsage) => {
-  return Math.round(cpuUsage * CPU_WEIGHT + memoryUsage * MEMORY_WEIGHT);
-};
+function calculateResourceScore(cpuUsage, memoryUsage) {
+  return cpuUsage * 0.6 + memoryUsage * 0.4;
+}
 
 /**
- * hasEnoughResources
- * ------------------
- * Checks whether a worker can accommodate a task's resource requirements.
- *
- * Converts task CPU cores to a percentage of the worker's totalCpu,
- * and task memory (MB) to a percentage of the worker's totalMemory.
- * Then verifies the worker has headroom (available ≥ required).
- *
- * @param {object} worker - Worker object from workerStore
- * @param {number} taskCpu    - CPU cores required by the task
- * @param {number} taskMemory - Memory (MB) required by the task
- * @returns {boolean}
+ * Calculates available CPU in cores.
  */
-const hasEnoughResources = (worker, taskCpu, taskMemory) => {
-  const availableCpuPct    = 100 - worker.cpuUsage;     // e.g. 100 - 20 = 80%
-  const availableMemoryPct = 100 - worker.memoryUsage;  // e.g. 100 - 35 = 65%
-
-  // Convert task requirements to percentages relative to this worker
-  const requiredCpuPct    = (taskCpu / worker.totalCpu) * 100;
-  const requiredMemoryPct = (taskMemory / worker.totalMemory) * 100;
-
-  return (
-    worker.status === "online" &&
-    availableCpuPct    >= requiredCpuPct &&
-    availableMemoryPct >= requiredMemoryPct
-  );
-};
+function getAvailableCpu(worker) {
+  return worker.totalCpu * (1 - worker.cpuUsage / 100);
+}
 
 /**
- * simulateResourceIncrease
- * ------------------------
- * Updates a worker's simulated CPU and memory usage after task assignment.
- * Clamps values to a maximum of 100% to keep the simulation realistic.
- *
- * @param {object} worker     - Worker object (mutated in place)
- * @param {number} taskCpu    - CPU cores consumed by the task
- * @param {number} taskMemory - Memory (MB) consumed by the task
+ * Calculates available Memory in MB.
  */
-const simulateResourceIncrease = (worker, taskCpu, taskMemory) => {
-  const cpuIncreasePct    = (taskCpu / worker.totalCpu) * 100;
-  const memoryIncreasePct = (taskMemory / worker.totalMemory) * 100;
+function getAvailableMemory(worker) {
+  return worker.totalMemory * (1 - worker.memoryUsage / 100);
+}
 
-  worker.cpuUsage    = Math.min(100, Math.round(worker.cpuUsage    + cpuIncreasePct));
-  worker.memoryUsage = Math.min(100, Math.round(worker.memoryUsage + memoryIncreasePct));
+/**
+ * Checks if a worker has enough available CPU and Memory for a given task.
+ */
+function hasEnoughResources(worker, taskCpu, taskMemory) {
+  const availCpu = getAvailableCpu(worker);
+  const availMem = getAvailableMemory(worker);
+
+  return availCpu >= taskCpu && availMem >= taskMemory;
+}
+
+/**
+ * Updates worker's simulated CPU and Memory usage after task assignment.
+ * CPU increase percentage = (taskCpu / totalCpu) * 100
+ * Memory increase percentage = (taskMemory / totalMemory) * 100
+ */
+function updateWorkerResourceUsage(worker, taskCpu, taskMemory) {
+  const cpuDelta = (taskCpu / worker.totalCpu) * 100;
+  const memDelta = (taskMemory / worker.totalMemory) * 100;
+
+  const newCpu = Math.min(100, Math.round((worker.cpuUsage + cpuDelta) * 10) / 10);
+  const newMem = Math.min(100, Math.round((worker.memoryUsage + memDelta) * 10) / 10);
+
+  return {
+    cpuBefore: worker.cpuUsage,
+    memoryBefore: worker.memoryUsage,
+    cpuAfter: newCpu,
+    memoryAfter: newMem,
+  };
+}
+
+module.exports = {
+  calculateResourceScore,
+  getAvailableCpu,
+  getAvailableMemory,
+  hasEnoughResources,
+  updateWorkerResourceUsage,
 };
-
-module.exports = { calculateScore, hasEnoughResources, simulateResourceIncrease };

@@ -1,17 +1,16 @@
 /**
  * workerStore.js
  * --------------
- * In-memory registry of simulated worker nodes.
- * In a later layer, these will be real container/process registrations.
+ * In-memory storage for simulated worker nodes.
  *
- * Fields:
- *   id          — unique worker identifier
- *   status      — "online" | "offline"
- *   cpuUsage    — current CPU usage percentage (0–100)
- *   memoryUsage — current Memory usage percentage (0–100)
- *   totalCpu    — total CPU cores available
- *   totalMemory — total Memory in MB
- *   activeTasks — number of tasks currently running on this worker
+ * Each worker node has:
+ *  - id: unique identifier
+ *  - status: "online" | "offline"
+ *  - cpuUsage: current CPU utilization percentage (0 - 100)
+ *  - memoryUsage: current Memory utilization percentage (0 - 100)
+ *  - totalCpu: total CPU cores available
+ *  - totalMemory: total memory available in MB
+ *  - activeTasks: number of tasks currently running on this worker
  */
 
 const workers = [
