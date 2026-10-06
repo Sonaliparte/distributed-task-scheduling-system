@@ -3,23 +3,26 @@ import type { Task, TaskStatus } from '../types';
 
 interface TaskTableProps {
   tasks: Task[];
-  onCancelTask: (id: number) => void;
+  onCancelTask: (id: string | number) => void;
 }
 
 const FILTERS: { label: string; value: TaskStatus | 'All' }[] = [
   { label: 'All',       value: 'All' },
-  { label: 'Running',   value: 'Running' },
   { label: 'Queued',    value: 'Queued' },
+  { label: 'Assigned',  value: 'Assigned' },
+  { label: 'Running',   value: 'Running' },
   { label: 'Completed', value: 'Completed' },
   { label: 'Failed',    value: 'Failed' },
 ];
 
 function statusBadge(status: TaskStatus) {
   switch (status) {
+    case 'Assigned':  return 'badge-blue';
     case 'Running':   return 'badge-blue';
     case 'Completed': return 'badge-green';
     case 'Queued':    return 'badge-amber';
     case 'Failed':    return 'badge-red';
+    default:          return 'badge-amber';
   }
 }
 
@@ -28,6 +31,7 @@ function priorityClass(priority: Task['priority']) {
     case 'High':   return 'priority-high';
     case 'Medium': return 'priority-medium';
     case 'Low':    return 'priority-low';
+    default:       return 'priority-medium';
   }
 }
 
@@ -36,7 +40,16 @@ function priorityDot(priority: Task['priority']) {
     case 'High':   return '●';
     case 'Medium': return '◉';
     case 'Low':    return '○';
+    default:       return '◉';
   }
+}
+
+function formatShortId(id: string | number): string {
+  const str = String(id);
+  if (str.length > 8) {
+    return str.substring(0, 8) + '...';
+  }
+  return str;
 }
 
 export default function TaskTable({ tasks, onCancelTask }: TaskTableProps) {
@@ -89,7 +102,11 @@ export default function TaskTable({ tasks, onCancelTask }: TaskTableProps) {
             ) : (
               visible.map(task => (
                 <tr key={task.id}>
-                  <td><span className="task-id">#{task.id}</span></td>
+                  <td>
+                    <span className="task-id" title={String(task.id)}>
+                      #{formatShortId(task.id)}
+                    </span>
+                  </td>
                   <td>
                     <div className="task-name-cell">{task.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{task.type}</div>
@@ -120,6 +137,9 @@ export default function TaskTable({ tasks, onCancelTask }: TaskTableProps) {
                       >
                         Cancel
                       </button>
+                    )}
+                    {task.status === 'Assigned' && (
+                      <span style={{ fontSize: 11, color: 'var(--accent)' }}>📌 Assigned</span>
                     )}
                     {task.status === 'Running' && (
                       <span style={{ fontSize: 11, color: 'var(--blue)' }}>⟳ Running</span>

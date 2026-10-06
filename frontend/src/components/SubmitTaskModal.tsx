@@ -1,38 +1,75 @@
 import { useState } from 'react';
-import type { Task, TaskType, TaskPriority } from '../types';
+import type { TaskType, TaskPriority } from '../types';
+import type { CreateTaskPayload } from '../services/api';
 
 interface SubmitTaskModalProps {
   onClose: () => void;
-  onSubmit: (task: Omit<Task, 'id' | 'createdAt' | 'status' | 'worker'>) => void;
+  onSubmit: (payload: CreateTaskPayload) => Promise<void>;
+  loadingStep?: string | null; // e.g. "Submitting...", "Scheduling..."
 }
 
-const TASK_TYPES: TaskType[] = [
-  'Image Processing',
-  'Data Processing',
-  'File Compression',
-  'Report Generation',
-  'Custom Task',
+const TASK_TYPES: { label: string; value: string }[] = [
+  { label: 'Image Processing', value: 'image-processing' },
+  { label: 'Data Processing', value: 'data-processing' },
+  { label: 'File Compression', value: 'file-compression' },
+  { label: 'Report Generation', value: 'report-generation' },
+  { label: 'Custom Task', value: 'custom-task' },
 ];
 
-export default function SubmitTaskModal({ onClose, onSubmit }: SubmitTaskModalProps) {
-  const [name,     setName]     = useState('');
-  const [type,     setType]     = useState<TaskType>('Image Processing');
-  const [priority, setPriority] = useState<TaskPriority>('Medium');
-  const [cores,    setCores]    = useState(1);
-  const [memory,   setMemory]   = useState(256);
+export default function SubmitTaskModal({ onClose, onSubmit, loadingStep }: SubmitTaskModalProps) {
+  const [name, setName] = useState('');
+  const [type, setType] = useState('image-processing');
+  const [priority, setPriority] = useState<TaskPriority>('High');
+  const [cores, setCores] = useState(2);
+  const [memory, setMemory] = useState(512);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleSubmit = () => {
-    if (!name.trim()) return;
-    onSubmit({ name: name.trim(), type, priority, cpuCores: cores, memoryMB: memory });
+  const handleSubmit = async () => {
+    if (!name.trim() || isSubmitting) return;
+
+    try {
+      setIsSubmitting(true);
+      setErrorMsg(null);
+
+      await onSubmit({
+        name: name.trim(),
+        type,
+        priority: priority.toLowerCase(),
+        cpu: cores,
+        memory,
+      });
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Task creation failed');
+      setIsSubmitting(false);
+    }
   };
 
+  const currentLoadingText = loadingStep || (isSubmitting ? 'Submitting...' : null);
+
   return (
-    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget && !isSubmitting) onClose(); }}>
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="modal-header">
           <div className="modal-title" id="modal-title">Submit New Task</div>
-          <button className="modal-close" onClick={onClose} type="button" aria-label="Close modal">✕</button>
+          <button className="modal-close" onClick={onClose} type="button" disabled={isSubmitting} aria-label="Close modal">✕</button>
         </div>
+
+        {errorMsg && (
+          <div
+            style={{
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid var(--red)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '10px 14px',
+              fontSize: 13,
+              color: 'var(--red)',
+              marginBottom: 16,
+            }}
+          >
+            ⚠️ {errorMsg}
+          </div>
+        )}
 
         {/* Task Name */}
         <div className="form-group">
@@ -41,9 +78,10 @@ export default function SubmitTaskModal({ onClose, onSubmit }: SubmitTaskModalPr
             id="task-name"
             className="form-input"
             type="text"
-            placeholder="e.g. Process weekly report"
+            placeholder="e.g. Image Processing Job"
             value={name}
             onChange={e => setName(e.target.value)}
+            disabled={isSubmitting}
             autoFocus
           />
         </div>
@@ -55,10 +93,11 @@ export default function SubmitTaskModal({ onClose, onSubmit }: SubmitTaskModalPr
             id="task-type"
             className="form-select"
             value={type}
-            onChange={e => setType(e.target.value as TaskType)}
+            onChange={e => setType(e.target.value)}
+            disabled={isSubmitting}
           >
             {TASK_TYPES.map(t => (
-              <option key={t} value={t}>{t}</option>
+              <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
         </div>
@@ -71,6 +110,7 @@ export default function SubmitTaskModal({ onClose, onSubmit }: SubmitTaskModalPr
               <button
                 key={p}
                 type="button"
+                disabled={isSubmitting}
                 className={`priority-btn${priority === p ? ` active-${p.toLowerCase()}` : ''}`}
                 onClick={() => setPriority(p)}
               >
@@ -89,6 +129,7 @@ export default function SubmitTaskModal({ onClose, onSubmit }: SubmitTaskModalPr
               min={1}
               max={16}
               value={cores}
+              disabled={isSubmitting}
               onChange={e => setCores(Number(e.target.value))}
               aria-label="CPU cores"
             />
@@ -106,6 +147,7 @@ export default function SubmitTaskModal({ onClose, onSubmit }: SubmitTaskModalPr
               max={8192}
               step={64}
               value={memory}
+              disabled={isSubmitting}
               onChange={e => setMemory(Number(e.target.value))}
               aria-label="Memory in MB"
             />
@@ -124,20 +166,21 @@ export default function SubmitTaskModal({ onClose, onSubmit }: SubmitTaskModalPr
             marginBottom: 4,
           }}
         >
-          ℹ️ This task will be added to the queue with <strong style={{ color: 'var(--text-secondary)' }}>Queued</strong> status. 
-          No backend API is called — simulation only.
+          ⚡ Submitting will create a task via <strong style={{ color: 'var(--text-secondary)' }}>POST /api/tasks</strong> and automatically trigger the backend scheduler via <strong style={{ color: 'var(--text-secondary)' }}>POST /api/scheduler/schedule/:taskId</strong>.
         </div>
 
         <div className="modal-actions">
-          <button className="btn btn-secondary" type="button" onClick={onClose}>Cancel</button>
+          <button className="btn btn-secondary" type="button" onClick={onClose} disabled={isSubmitting}>
+            Cancel
+          </button>
           <button
             className="btn btn-primary"
             type="button"
             onClick={handleSubmit}
-            disabled={!name.trim()}
-            style={{ opacity: name.trim() ? 1 : 0.5 }}
+            disabled={!name.trim() || isSubmitting}
+            style={{ opacity: name.trim() && !isSubmitting ? 1 : 0.5 }}
           >
-            Submit Task
+            {currentLoadingText || 'Submit Task'}
           </button>
         </div>
       </div>

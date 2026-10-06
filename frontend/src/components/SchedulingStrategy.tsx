@@ -5,10 +5,15 @@ interface SchedulingStrategyProps {
   onChange: (s: SchedulingStrategy) => void;
 }
 
-const STRATEGIES: { key: SchedulingStrategy; desc: string }[] = [
+const STRATEGIES: { key: SchedulingStrategy; desc: string; activeInBackend?: boolean }[] = [
+  {
+    key: 'Resource-Aware',
+    desc: 'Backend Algorithm: Evaluates CPU & Memory capacity and calculates score (CPU * 0.6 + Memory * 0.4). Selects the least-loaded worker.',
+    activeInBackend: true,
+  },
   {
     key: 'Round Robin',
-    desc: 'Distributes tasks sequentially across available workers in a circular order.',
+    desc: 'Distributes tasks sequentially across available workers in a circular order (Future Layer).',
   },
   {
     key: 'Least Loaded',
@@ -16,12 +21,13 @@ const STRATEGIES: { key: SchedulingStrategy; desc: string }[] = [
   },
   {
     key: 'Priority Based',
-    desc: 'Processes higher-priority tasks first — High → Medium → Low — regardless of submission order.',
+    desc: 'Processes higher-priority tasks first — High → Medium → Low (Future Layer).',
   },
 ];
 
 export default function SchedulingStrategy({ selected, onChange }: SchedulingStrategyProps) {
-  const info = STRATEGIES.find(s => s.key === selected)!;
+  const currentStrategyKey = selected === 'Resource-Aware' ? 'Resource-Aware' : selected;
+  const info = STRATEGIES.find(s => s.key === currentStrategyKey) || STRATEGIES[0];
 
   return (
     <div className="section">
@@ -41,10 +47,23 @@ export default function SchedulingStrategy({ selected, onChange }: SchedulingStr
             aria-label="Scheduling strategy"
           >
             {STRATEGIES.map(s => (
-              <option key={s.key} value={s.key}>{s.key}</option>
+              <option key={s.key} value={s.key}>
+                {s.key} {s.activeInBackend ? '(Active Backend Engine)' : '(Future Layer)'}
+              </option>
             ))}
           </select>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Strategy active (UI only)</span>
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--green)',
+              background: 'rgba(34,197,94,0.12)',
+              padding: '4px 10px',
+              borderRadius: 12,
+            }}
+          >
+            ● Current Algorithm: Resource-Aware
+          </span>
         </div>
 
         <div className="strategy-info">
@@ -53,7 +72,7 @@ export default function SchedulingStrategy({ selected, onChange }: SchedulingStr
         </div>
 
         <div className="strategy-note">
-          ⚠️ Scheduling logic will be implemented in the backend scheduler. This selection only changes the UI state for now.
+          ℹ️ <strong>Backend Source of Truth:</strong> Layer 3 engine currently executes the <strong style={{ color: 'var(--text-primary)' }}>Resource-Aware</strong> algorithm on <strong style={{ color: 'var(--text-primary)' }}>http://localhost:5000</strong>.
         </div>
       </div>
     </div>
