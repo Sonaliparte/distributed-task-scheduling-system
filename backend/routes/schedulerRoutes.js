@@ -4,11 +4,21 @@
  * Routes for scheduler endpoints. Mounted at /api/scheduler in server.js.
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { scheduleTask } = require("../controllers/schedulerController");
+const {
+  scheduleTask,
+  getStrategyHandler,
+  setStrategyHandler,
+} = require('../controllers/schedulerController');
 
 // POST /api/scheduler/schedule/:taskId  → Schedule a task
-router.post("/schedule/:taskId", scheduleTask);
+router.post('/schedule/:taskId', scheduleTask);
+
+// GET  /api/scheduler/strategy          → Get current strategy
+router.get('/strategy', getStrategyHandler);
+
+// POST /api/scheduler/strategy          → Set current strategy
+router.post('/strategy', setStrategyHandler);
 
 module.exports = router;

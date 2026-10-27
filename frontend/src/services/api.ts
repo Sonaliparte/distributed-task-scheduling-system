@@ -6,9 +6,25 @@ import type {
   TaskPriority,
   TaskStatus,
   WorkerStatus,
+  SchedulingStrategy,
 } from '../types';
 
 const API_BASE_URL = 'http://localhost:5000/api';
+
+// Maps frontend UI names → backend strategy keys (and reverse)
+export const STRATEGY_MAP: Record<SchedulingStrategy, string> = {
+  'Resource-Aware': 'resource-aware',
+  'Round Robin':    'round-robin',
+  'Least Loaded':   'least-loaded',
+  'Priority Based': 'priority-based',
+};
+
+export const REVERSE_STRATEGY_MAP: Record<string, SchedulingStrategy> = {
+  'resource-aware': 'Resource-Aware',
+  'round-robin':    'Round Robin',
+  'least-loaded':   'Least Loaded',
+  'priority-based': 'Priority Based',
+};
 
 // Helper to capitalize first letter
 function capitalize(str: string): string {
@@ -156,4 +172,26 @@ export async function scheduleTask(taskId: string | number): Promise<ScheduleRes
   }
 
   return res.json();
+}
+
+export async function fetchStrategy(): Promise<SchedulingStrategy> {
+  const res = await fetch(`${API_BASE_URL}/scheduler/strategy`);
+  if (!res.ok) throw new Error('Failed to fetch strategy');
+  const data = await res.json();
+  return REVERSE_STRATEGY_MAP[data.strategy] ?? 'Resource-Aware';
+}
+
+export async function updateStrategy(strategy: SchedulingStrategy): Promise<SchedulingStrategy> {
+  const backendKey = STRATEGY_MAP[strategy] ?? 'resource-aware';
+  const res = await fetch(`${API_BASE_URL}/scheduler/strategy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ strategy: backendKey }),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error((errData as { message?: string }).message || 'Failed to update strategy');
+  }
+  const data = await res.json();
+  return REVERSE_STRATEGY_MAP[data.strategy] ?? strategy;
 }

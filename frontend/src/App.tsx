@@ -15,6 +15,8 @@ import {
   fetchTasks,
   createTask,
   scheduleTask,
+  fetchStrategy,
+  updateStrategy,
   type CreateTaskPayload,
 } from './services/api';
 
@@ -89,8 +91,11 @@ export default function App() {
   // ─── Initial Load & 3-Second Auto Refresh Interval ───────────────────────────
 
   useEffect(() => {
-    // Initial fetch
+    // Initial fetch (includes strategy from backend)
     loadBackendData(true);
+    fetchStrategy()
+      .then(setStrategy)
+      .catch(() => { /* keep default */ });
 
     // Auto refresh every 3 seconds as required by spec
     const interval = setInterval(() => {
@@ -100,6 +105,23 @@ export default function App() {
     // Clean up interval on component unmount
     return () => clearInterval(interval);
   }, [loadBackendData]);
+
+  // ─── Strategy Change ─────────────────────────────────────────────────────────
+
+  const handleStrategyChange = useCallback(
+    async (s: StrategyType) => {
+      setStrategy(s); // optimistic update
+      try {
+        const confirmed = await updateStrategy(s);
+        setStrategy(confirmed);
+        addLog(`Scheduling strategy changed to: ${confirmed}`);
+      } catch (err) {
+        console.error('Failed to update strategy:', err);
+        addLog('⚠️ Failed to update scheduling strategy on backend');
+      }
+    },
+    [addLog]
+  );
 
   // ─── Submit Task Flow (Layer 2 POST /api/tasks -> Layer 3 POST /api/scheduler/schedule/:id)
 
@@ -125,7 +147,7 @@ export default function App() {
             'success'
           );
 
-          addLog(`Scheduler assigned Task #${createdTask.id} to ${assignedWorker} (Algorithm: Resource-Aware)`);
+          addLog(`Scheduler assigned Task #${createdTask.id} to ${assignedWorker} (Algorithm: ${strategy})`);
         } catch (scheduleErr: any) {
           console.error('Scheduling error:', scheduleErr);
           addToast(
@@ -198,7 +220,7 @@ export default function App() {
             onCancelTask={handleCancelTask}
             logs={logs}
             strategy={strategy}
-            onStrategyChange={setStrategy}
+            onStrategyChange={handleStrategyChange}
             connectionError={connectionError}
           />
         );
@@ -209,7 +231,7 @@ export default function App() {
       case 'Activity':
         return <ActivityPage logs={logs} />;
       case 'Settings':
-        return <SettingsPage strategy={strategy} onStrategyChange={setStrategy} />;
+        return <SettingsPage strategy={strategy} onStrategyChange={handleStrategyChange} />;
     }
   };
 

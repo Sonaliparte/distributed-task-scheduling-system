@@ -4,17 +4,18 @@
  * Controller for scheduler endpoints.
  */
 
-const { scheduleTaskById } = require("../services/schedulerService");
+const { scheduleTaskById } = require('../services/schedulerService');
+const { getStrategy, setStrategy, VALID_STRATEGIES } = require('../data/strategyStore');
 
 /**
  * POST /api/scheduler/schedule/:taskId
- * Schedules a specific queued task onto the best suited worker.
+ * Schedules a specific queued task onto the best-suited worker.
  */
 const scheduleTask = (req, res) => {
   const { taskId } = req.params;
 
   if (!taskId) {
-    return res.status(400).json({ message: "Task ID is required" });
+    return res.status(400).json({ message: 'Task ID is required' });
   }
 
   const result = scheduleTaskById(taskId);
@@ -26,4 +27,36 @@ const scheduleTask = (req, res) => {
   res.status(result.statusCode).json(result.data);
 };
 
-module.exports = { scheduleTask };
+/**
+ * GET /api/scheduler/strategy
+ * Returns the currently active scheduling strategy.
+ */
+const getStrategyHandler = (req, res) => {
+  res.status(200).json({
+    strategy: getStrategy(),
+    validStrategies: VALID_STRATEGIES,
+  });
+};
+
+/**
+ * POST /api/scheduler/strategy
+ * Updates the active scheduling strategy.
+ * Body: { strategy: "round-robin" | "least-loaded" | "resource-aware" | "priority-based" }
+ */
+const setStrategyHandler = (req, res) => {
+  const { strategy } = req.body;
+
+  if (!strategy) {
+    return res.status(400).json({ message: 'strategy field is required' });
+  }
+
+  try {
+    const updated = setStrategy(strategy);
+    console.log(`[SCHEDULER] Strategy changed to: ${updated}`);
+    res.status(200).json({ strategy: updated, validStrategies: VALID_STRATEGIES });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+};
+
+module.exports = { scheduleTask, getStrategyHandler, setStrategyHandler };
