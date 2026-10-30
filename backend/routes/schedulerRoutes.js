@@ -10,6 +10,7 @@ const {
   scheduleTask,
   getStrategyHandler,
   setStrategyHandler,
+  compareHandler,
 } = require('../controllers/schedulerController');
 
 // POST /api/scheduler/schedule/:taskId  → Schedule a task
@@ -20,5 +21,6 @@ router.get('/strategy', getStrategyHandler);
 
 // POST /api/scheduler/strategy          → Set current strategy
 router.post('/strategy', setStrategyHandler);
+router.post('/compare', compareHandler);
 
 module.exports = router;

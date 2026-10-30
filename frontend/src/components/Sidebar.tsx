@@ -12,6 +12,7 @@ const navItems: { page: Page; icon: string; label: string }[] = [
   { page: 'Tasks',    icon: '⊞', label: 'Tasks' },
   { page: 'Workers',  icon: '⎇', label: 'Workers' },
   { page: 'Activity', icon: '◎', label: 'Activity' },
+  { page: 'Comparison', icon: '≋', label: 'Comparison' },
   { page: 'Settings', icon: '⚙', label: 'Settings' },
 ];
 

@@ -88,4 +88,4 @@ export type SchedulingStrategy = 'Resource-Aware' | 'Round Robin' | 'Least Loade
 
 // ─── App Pages ──────────────────────────────────────────────────────────────────
 
-export type Page = 'Overview' | 'Tasks' | 'Workers' | 'Activity' | 'Settings';
+export type Page = 'Overview' | 'Tasks' | 'Workers' | 'Activity' | 'Comparison' | 'Settings';

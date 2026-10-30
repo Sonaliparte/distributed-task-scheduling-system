@@ -4,10 +4,11 @@ const app = express();
 
 app.use(express.json());
 
-const workerId = process.argv[2] || "worker-1";
-const port = Number(process.argv[3]) || 6001;
+const workerId = process.env.WORKER_ID || process.argv[2] || "worker-1";
+const port = Number(process.env.PORT || process.argv[3]) || 6001;
+const advertisedUrl = process.env.WORKER_ADVERTISE_URL || `http://localhost:${port}`;
 
-const schedulerUrl = "http://localhost:5001";
+const schedulerUrl = process.env.SCHEDULER_URL || "http://localhost:5000/api";
 
 let currentTasks = 0;
 
@@ -61,12 +62,13 @@ app.post("/execute", async (req, res) => {
     // Tell scheduler that task is completed
     try {
       await fetch(
-        `${schedulerUrl}/tasks/${task.id}/complete`,
+        `${schedulerUrl}/workers/tasks/${task.id}/complete`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
+          body: JSON.stringify({ workerId, result: "success" }),
         }
       );
     } catch (error) {
@@ -90,6 +92,9 @@ setInterval(async () => {
       },
       body: JSON.stringify({
         id: workerId,
+        cpuUsage: 0,
+        memoryUsage: 0,
+        activeTasks: currentTasks,
       }),
     });
   } catch (error) {
@@ -117,7 +122,9 @@ app.listen(port, async () => {
       },
       body: JSON.stringify({
         id: workerId,
-        url: `http://localhost:${port}`,
+        url: advertisedUrl,
+        totalCpu: Number(process.env.WORKER_CPU) || 1,
+        totalMemory: Number(process.env.WORKER_MEMORY) || 1024,
       }),
     });
 

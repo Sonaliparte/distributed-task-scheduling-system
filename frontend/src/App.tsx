@@ -9,12 +9,12 @@ import TaskTable from './components/TaskTable';
 import SubmitTaskModal from './components/SubmitTaskModal';
 import ActivityLog from './components/ActivityLog';
 import SchedulingStrategy from './components/SchedulingStrategy';
+import ComparisonDashboard from './components/ComparisonDashboard';
 
 import {
   fetchWorkers,
   fetchTasks,
   createTask,
-  scheduleTask,
   fetchStrategy,
   updateStrategy,
   type CreateTaskPayload,
@@ -135,30 +135,9 @@ export default function App() {
         addLog(`Task created: "${createdTask.name}" (ID: ${createdTask.id})`);
 
         setModalLoadingStep('Scheduling...');
+        addToast('Task Submitted', `Task "${createdTask.name}" was accepted by the scheduler.`, 'success');
 
-        // 2. Automatically trigger scheduler endpoint
-        try {
-          const scheduleRes = await scheduleTask(createdTask.id);
-          const assignedWorker = scheduleRes.workerId || 'Worker Node';
-
-          addToast(
-            'Task Scheduled Successfully',
-            `Task "${createdTask.name}" scheduled on ${assignedWorker}`,
-            'success'
-          );
-
-          addLog(`Scheduler assigned Task #${createdTask.id} to ${assignedWorker} (Algorithm: ${strategy})`);
-        } catch (scheduleErr: any) {
-          console.error('Scheduling error:', scheduleErr);
-          addToast(
-            'Scheduling Failed',
-            'Task created, but scheduling failed.',
-            'error'
-          );
-          addLog(`⚠️ Scheduling failed for Task #${createdTask.id}: ${scheduleErr.message}`);
-        }
-
-        // 3. Immediately refresh dashboard state
+        // Refresh dashboard state after backend creation and scheduling.
         await loadBackendData(false);
 
         // Close modal
@@ -230,6 +209,8 @@ export default function App() {
         return <WorkersPage workers={workers} connectionError={connectionError} />;
       case 'Activity':
         return <ActivityPage logs={logs} />;
+      case 'Comparison':
+        return <ComparisonDashboard tasks={tasks} />;
       case 'Settings':
         return <SettingsPage strategy={strategy} onStrategyChange={handleStrategyChange} />;
     }

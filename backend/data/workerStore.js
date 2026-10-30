@@ -28,6 +28,11 @@ const workers = [
     totalCpu: 4,
     totalMemory: 8192,
     activeTasks: 0,
+    completedTasks: 0,
+    failedTasks: 0,
+    url: null,
+    lastHeartbeat: new Date().toISOString(),
+    registeredAt: new Date().toISOString(),
   },
   {
     id: "worker-02",
@@ -37,6 +42,11 @@ const workers = [
     totalCpu: 4,
     totalMemory: 8192,
     activeTasks: 0,
+    completedTasks: 0,
+    failedTasks: 0,
+    url: null,
+    lastHeartbeat: new Date().toISOString(),
+    registeredAt: new Date().toISOString(),
   },
   {
     id: "worker-03",
@@ -46,6 +56,11 @@ const workers = [
     totalCpu: 4,
     totalMemory: 8192,
     activeTasks: 0,
+    completedTasks: 0,
+    failedTasks: 0,
+    url: null,
+    lastHeartbeat: new Date().toISOString(),
+    registeredAt: new Date().toISOString(),
   },
 ];
 

@@ -7,6 +7,7 @@
 
 const { v4: uuidv4 } = require("uuid");
 const tasks = require("../data/taskStore");
+const { scheduleTaskById } = require('../services/schedulerService');
 
 // Valid priority levels
 const VALID_PRIORITIES = ["low", "medium", "high"];
@@ -28,13 +29,13 @@ const createTask = (req, res) => {
 
   // --- Validation ---
   // Check all required fields are present
-  if (!name || !type || !priority || cpu === undefined || memory === undefined) {
+  if (typeof name !== 'string' || !name.trim() || typeof type !== 'string' || !type.trim() || !priority || cpu === undefined || memory === undefined) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
   // cpu and memory must be numbers
-  if (typeof cpu !== "number" || typeof memory !== "number") {
-    return res.status(400).json({ message: "cpu and memory must be numbers" });
+  if (typeof cpu !== "number" || typeof memory !== "number" || !Number.isFinite(cpu) || !Number.isFinite(memory) || cpu <= 0 || memory <= 0) {
+    return res.status(400).json({ message: "cpu and memory must be positive finite numbers" });
   }
 
   // priority must be one of the accepted values
@@ -55,12 +56,22 @@ const createTask = (req, res) => {
     status: "queued",      // default status — scheduler will update this later
     worker: null,          // no worker assigned yet
     createdAt: new Date().toISOString(),
+    retryCount: 0,
+    maxRetries: Number(process.env.TASK_MAX_RETRIES || 3),
+    executionHistory: [],
   };
 
   // Store the task in memory
   tasks.push(newTask);
 
-  // Respond with the created task and HTTP 201
+  // Auto-schedule immediately — same as the task generator does
+  const schedResult = scheduleTaskById(newTask.id);
+  console.log(
+    `[TASK-CTRL] POST /api/tasks → created "${newTask.name}" (${newTask.id}) | ` +
+    `scheduling: ${schedResult.success ? 'assigned to ' + schedResult.data?.workerId : schedResult.data?.message || schedResult.message}`
+  );
+
+  // Respond with the (possibly already-assigned) task and HTTP 201
   res.status(201).json(newTask);
 };
 

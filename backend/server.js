@@ -14,6 +14,7 @@ const taskRoutes = require('./routes/taskRoutes');
 const workerRoutes = require('./routes/workerRoutes');
 const schedulerRoutes = require('./routes/schedulerRoutes');
 const { startTaskGenerator } = require('./services/taskGenerator');
+const { startWorkerMonitor } = require('./services/workerMonitor');
 
 const app = express();
 
@@ -76,4 +77,5 @@ app.listen(PORT, () => {
   // Start automatic task generation AFTER the server is ready.
   // The singleton guard in taskGenerator prevents duplicate starts.
   startTaskGenerator(5000);
+  startWorkerMonitor();
 });

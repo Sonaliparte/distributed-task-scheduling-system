@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { TaskType, TaskPriority } from '../types';
+import type { TaskPriority } from '../types';
 import type { CreateTaskPayload } from '../services/api';
 
 interface SubmitTaskModalProps {

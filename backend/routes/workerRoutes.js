@@ -6,10 +6,19 @@
 
 const express = require("express");
 const router = express.Router();
-const { getAllWorkers, getWorkerById } = require("../controllers/workerController");
+const {
+	getAllWorkers,
+	getWorkerById,
+	registerWorker,
+	heartbeat,
+	completeTask,
+} = require("../controllers/workerController");
 
 // GET /api/workers       → List all workers
 router.get("/", getAllWorkers);
+router.post('/register', registerWorker);
+router.post('/heartbeat', heartbeat);
+router.post('/tasks/:taskId/complete', completeTask);
 
 // GET /api/workers/:id   → Get worker by ID
 router.get("/:id", getWorkerById);

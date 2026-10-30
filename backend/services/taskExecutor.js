@@ -36,6 +36,28 @@ function releaseWorkerResources(worker, taskCpu, taskMemory) {
   worker.activeTasks = Math.max(0, worker.activeTasks - 1);
 }
 
+function finishTask(task, worker, result = 'success') {
+  if (task.status !== 'running' && task.status !== 'assigned') return false;
+  task.status = result === 'success' ? 'completed' : 'failed';
+  task.completedAt = new Date().toISOString();
+  task.result = result;
+  task.executionHistory = task.executionHistory || [];
+  task.executionHistory.push({
+    workerId: worker.id,
+    status: task.status,
+    completedAt: task.completedAt,
+  });
+  releaseWorkerResources(worker, task.cpu, task.memory);
+  if (task.status === 'completed') worker.completedTasks = (worker.completedTasks || 0) + 1;
+  else worker.failedTasks = (worker.failedTasks || 0) + 1;
+  executing.delete(task.id);
+  return true;
+}
+
+function completeExternalTask(task, worker, result) {
+  return finishTask(task, worker, result);
+}
+
 /**
  * Begins the simulated execution lifecycle for an assigned task.
  * @param {object} task    - The task object from taskStore (mutated in place)
@@ -49,6 +71,30 @@ function executeTask(task, worker, onComplete) {
   }
 
   executing.add(task.id);
+
+  if (worker.url) {
+    task.status = 'running';
+    task.startedAt = new Date().toISOString();
+    task.executionHistory = task.executionHistory || [];
+    task.executionHistory.push({ workerId: worker.id, status: 'running', startedAt: task.startedAt });
+    fetch(`${worker.url}/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(task),
+    }).then((response) => {
+      if (!response.ok) throw new Error(`worker returned ${response.status}`);
+    }).catch((error) => {
+      console.error(`[EXECUTOR] Dispatch to ${worker.id} failed: ${error.message}`);
+      worker.status = 'offline';
+      finishTask(task, worker, 'failed');
+      task.status = 'queued';
+      task.worker = null;
+      task.retryCount = (task.retryCount || 0) + 1;
+      if (task.retryCount > (task.maxRetries || 3)) task.status = 'failed';
+      if (typeof onComplete === 'function') onComplete();
+    });
+    return;
+  }
 
   const runDelay = 2000 + Math.floor(Math.random() * 2000); // 2–4 seconds to start running
   const completeDelay = 4000 + Math.floor(Math.random() * 6000); // 4–10 seconds to complete
@@ -74,14 +120,7 @@ function executeTask(task, worker, onComplete) {
         return;
       }
 
-      task.status = 'completed';
-      task.completedAt = new Date().toISOString();
-      task.result = 'success';
-
-      // Release resources back to the worker
-      releaseWorkerResources(worker, task.cpu, task.memory);
-
-      executing.delete(task.id);
+      finishTask(task, worker);
 
       console.log(
         `[EXECUTOR] Task "${task.name}" (${task.id}) COMPLETED on ${worker.id}. ` +
@@ -96,4 +135,4 @@ function executeTask(task, worker, onComplete) {
   }, runDelay);
 }
 
-module.exports = { executeTask };
+module.exports = { executeTask, releaseWorkerResources, completeExternalTask };

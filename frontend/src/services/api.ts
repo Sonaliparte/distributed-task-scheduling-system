@@ -195,3 +195,33 @@ export async function updateStrategy(strategy: SchedulingStrategy): Promise<Sche
   const data = await res.json();
   return REVERSE_STRATEGY_MAP[data.strategy] ?? strategy;
 }
+
+export interface ComparisonResult {
+  strategy: string;
+  metrics: {
+    schedulingLatencyMs: number;
+    averageWaitingMs: number;
+    completionRate: number;
+    failedTaskCount: number;
+    workerLoadDistribution: Array<{ workerId: string; cpuUsage: number; memoryUsage: number; activeTasks: number }>;
+  };
+}
+
+export async function compareStrategies(workload: Array<{ cpu: number; memory: number; priority: string; durationMs?: number }>): Promise<{
+  metricMode: string;
+  measuredMetrics: string[];
+  simulatedMetrics: string[];
+  workloadSize: number;
+  results: ComparisonResult[];
+}> {
+  const res = await fetch(`${API_BASE_URL}/scheduler/compare`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ workload }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || 'Comparison failed');
+  }
+  return res.json();
+}

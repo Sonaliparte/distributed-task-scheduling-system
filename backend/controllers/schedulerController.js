@@ -6,6 +6,8 @@
 
 const { scheduleTaskById } = require('../services/schedulerService');
 const { getStrategy, setStrategy, VALID_STRATEGIES } = require('../data/strategyStore');
+const workers = require('../data/workerStore');
+const { compareStrategies } = require('../services/comparisonService');
 
 /**
  * POST /api/scheduler/schedule/:taskId
@@ -59,4 +61,12 @@ const setStrategyHandler = (req, res) => {
   }
 };
 
-module.exports = { scheduleTask, getStrategyHandler, setStrategyHandler };
+const compareHandler = (req, res) => {
+  try {
+    res.status(200).json(compareStrategies(req.body.workload, workers));
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+module.exports = { scheduleTask, getStrategyHandler, setStrategyHandler, compareHandler };
